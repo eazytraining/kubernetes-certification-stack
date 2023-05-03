@@ -13,6 +13,9 @@
     kubernetes_config_kubelet_configuration:
       cgroupDriver: "systemd"
       failSwapOn: false
+    kubernetes_config_kube_proxy_configuration:
+      ipvs:
+        strictARP: true
     kubernetes_config_init_configuration:
       # details of these parameters could be found here https://pkg.go.dev/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1
       localAPIEndpoint:
