@@ -50,3 +50,12 @@
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
     - role: geerlingguy.kubernetes
+  post_tasks:
+  - name: Configure Flannel networking for enp0s8
+    command: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\        - --iface=enp0s8' | kubectl apply -f -"
+    register: flannel_result
+    changed_when: "'created' in flannel_result.stdout"
+    when: kubernetes_pod_network.cni == 'flannel' and kubernetes_role == "control_plane"
+    retries: 3
+    delay: 5
+    
