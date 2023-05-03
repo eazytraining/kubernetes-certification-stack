@@ -9,6 +9,7 @@
       cidr: '10.244.0.0/16'
     kubernetes_yum_gpg_check: false
     kubernetes_yum_repo_gpg_check: false
+    kubernetes_kubelet_extra_args: "--node-ip={{ ansible_enp0s8.ipv4.address }}"
     kubernetes_config_kubelet_configuration:
       cgroupDriver: "systemd"
       failSwapOn: false
