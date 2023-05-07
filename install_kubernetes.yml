@@ -53,6 +53,14 @@
     shell: |
       swapon -a
     when: swap_disabled == true
+    
+  - name: install ntp
+    yum:
+      name: ntp
+      state: installed
+  - name: update time
+    service: name=ntpd state=restarted
+    
   roles:
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
