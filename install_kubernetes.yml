@@ -3,6 +3,7 @@
 
   vars:
     token: "783bde.3f89s0fje9f38fhf"
+    swap_disabled: true
     # The follow two parameter was explained here https://github.com/geerlingguy/ansible-role-kubernetes#variables-to-configure-kubeadm-and-kubelet-through-command-line-options
     kubernetes_pod_network:
       cni: 'flannel'
@@ -48,7 +49,10 @@
       state: present
     when: >
       ansible_distribution != 'Debian' 
- 
+  - name: disable swap
+    shell: |
+      swapon -a
+    when: swap_disabled == true
   roles:
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
