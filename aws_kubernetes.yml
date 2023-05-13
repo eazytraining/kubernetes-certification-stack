@@ -1,0 +1,356 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Metadata:
+  License: Apache-2.0
+
+Description: Create a variable number of EC2 instance resources.
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    Default: devops
+
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  InstanceCount:
+    Description: Number of EC2 worker instances (must be between 1 and 3).
+    Type: String
+    Default: 1
+    AllowedValues:
+      - "1"
+      - "2"
+      - "3"
+  InstanceTypeInstance:
+    Description: Instance type to launch EC2 Remote instances.
+    Type: String
+    Default: t2.medium
+    AllowedValues: [t2.micro, t2.medium, t2.large, t2.xlarge, t2.2xlarge,
+      t3.nano, t3.micro, t3.small, t3.medium, t3.large, t3.xlarge, t3.2xlarge,
+      m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.10xlarge,
+      m5.large, m5.xlarge, m5.2xlarge, m5.4xlarge,
+      c5.large, c5.xlarge, c5.2xlarge, c5.4xlarge, c5.9xlarge,
+      g3.8xlarge,
+      r5.large, r5.xlarge, r5.2xlarge, r5.4xlarge, r3.12xlarge,
+      i3.xlarge, i3.2xlarge, i3.4xlarge, i3.8xlarge,
+      d2.xlarge, d2.2xlarge, d2.4xlarge, d2.8xlarge]
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  ImageTypeInstance:
+    Description: image type for instance server
+    Default: "CentOS Linux 7 (Core) - ami-0057d8e6fb0692b80"
+    Type: String
+    AllowedValues:
+#      - "Debian GNU/Linux 9 (stretch) - ami-003f19e0e687de1cd"
+      - "CentOS Linux 7 (Core) - ami-0057d8e6fb0692b80"
+    ConstraintDescription: must specify debian or centos
+
+  StorageInstance:
+    Description: Storage size (Go) for Remote server
+    Default: "10"
+    Type: String
+    AllowedValues:
+      - "10"
+      - "20"
+      - "30"
+      - "50"
+    ConstraintDescription: must specify 10, 20, 30 or 50 Go.
+
+Conditions:
+  Launch1: !Equals [1, 1]
+  Launch2: !Or
+  - !Equals [2, !Ref InstanceCount]
+  - !Equals [3, !Ref InstanceCount]
+  
+
+  Launch3: !Equals [3, !Ref InstanceCount]
+
+  DebianImageInstance: !Equals [!Ref ImageTypeInstance, "Debian GNU/Linux 9 (stretch) - ami-003f19e0e687de1cd"]
+  CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-0057d8e6fb0692b80"]
+
+Resources:
+  ec2RoleDescribeInstance:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+
+  ec2InstanceProfileDescribeInstance:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref ec2RoleDescribeInstance
+
+  ec2RolePoliciesDescribeInstance:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: ec2RoleDescribeInstance
+      PolicyDocument:
+        Statement:
+            #Allow permission to describe all ec2 instances
+          - Effect: Allow
+            Action: 'ec2:DescribeInstances'
+            Resource: '*'
+      Roles:
+        - !Ref ec2RoleDescribeInstance
+
+  Master:
+    Type: AWS::EC2::Instance
+    Properties:
+      Tags:
+       - Key: Name
+         Value: 'master'
+      ImageId:
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+      InstanceType: !Ref InstanceTypeInstance
+      SecurityGroups: [!Ref 'SecurityGroup']
+      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
+      KeyName: !Ref 'KeyName'
+      UserData:
+        'Fn::Base64':
+          !Sub |
+            #!/bin/bash
+            sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+            sudo service sshd restart
+            sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
+            
+            # AWSCLI 2.x.x installation 
+            sudo apt-get install unzip -y
+            sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            sudo unzip awscliv2.zip
+            sudo ./aws/install
+
+            # Install kubernetes
+            yum -y update
+            yum -y install epel-release
+
+            # install ansible
+            yum -y install ansible
+            # retrieve ansible code
+            yum -y install git
+            rm -Rf kubernetes-certification-stack || echo "previous folder removed"
+            git clone https://github.com/eazytraining/kubernetes-certification-stack.git
+            cd kubernetes-certification-stack
+            KUBERNETES_VERSION=1.26.1
+            ansible-galaxy install -r roles/requirements.yml
+            ec2_private_ip = $(curl http://169.254.169.254/latest/meta-data/local-ipv4)
+            ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=control_plane kubernetes_apiserver_advertise_address=$ec2_private_ip kubernetes_version_rhel_package='$KUBERNETES_VERSION'"
+            yum install bash-completion -y && kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
+
+            
+
+      BlockDeviceMappings:
+        - DeviceName:
+            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
+          Ebs:
+            VolumeSize: !Ref StorageInstance
+            DeleteOnTermination: true
+  Instance1:
+    Condition: Launch1
+    Type: AWS::EC2::Instance
+    Properties:
+      Tags:
+       - Key: Name
+         Value: 'worker1'
+      ImageId:
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+      InstanceType: !Ref InstanceTypeInstance
+      SecurityGroups: [!Ref 'SecurityGroup']
+      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
+      KeyName: !Ref 'KeyName'
+      UserData:
+        'Fn::Base64':
+          !Sub |
+            #!/bin/bash
+            sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+            sudo service sshd restart
+            sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
+            
+            # AWSCLI 2.x.x installation 
+            sudo apt-get install unzip -y
+            sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            sudo unzip awscliv2.zip
+            sudo ./aws/install
+
+            # Install kubernetes
+            until KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text); do
+              if [  -z $KubernetesMasterPrivateIP  ]; then
+                sudo /usr/local/bin/aws configure set region us-east-1
+                KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
+              fi
+            done
+            IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+
+            until [($IS_MINIKUBE_UP == "livez check passed") ]
+            do
+                sleep 20
+                IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+            done
+            ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
+
+
+      BlockDeviceMappings:
+        - DeviceName:
+            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
+          Ebs:
+            VolumeSize: !Ref StorageInstance
+            DeleteOnTermination: true
+
+  Instance2:
+    Condition: Launch2
+    Type: AWS::EC2::Instance
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'worker2'
+      ImageId:
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+      InstanceType: !Ref InstanceTypeInstance
+      SecurityGroups: [!Ref 'SecurityGroup']
+      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
+      KeyName: !Ref 'KeyName'
+      UserData:
+        'Fn::Base64':
+          !Sub |
+            #!/bin/bash
+            sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+            sudo service sshd restart
+            sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
+            
+            # AWSCLI 2.x.x installation 
+            sudo apt-get install unzip -y
+            sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            sudo unzip awscliv2.zip
+            sudo ./aws/install
+
+            # Install kubernetes
+            until KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text); do
+              if [  -z $KubernetesMasterPrivateIP  ]; then
+                sudo /usr/local/bin/aws configure set region us-east-1
+                KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
+              fi
+            done
+            IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+
+            until [($IS_MINIKUBE_UP == "livez check passed") ]
+            do
+                sleep 20
+                IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+            done
+            ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
+
+
+
+      BlockDeviceMappings:
+        - DeviceName:
+            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
+          Ebs:
+            VolumeSize: !Ref StorageInstance
+            DeleteOnTermination: true
+
+  Instance3:
+    Condition: Launch3
+    Type: AWS::EC2::Instance
+    Properties:
+      Tags:
+        - Key: Name
+          Value: 'worker3'
+      ImageId:
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+      InstanceType: !Ref InstanceTypeInstance
+      SecurityGroups: [!Ref 'SecurityGroup']
+      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
+      KeyName: !Ref 'KeyName'
+      UserData:
+        'Fn::Base64':
+          !Sub |
+            #!/bin/bash
+            sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+            sudo service sshd restart
+            sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
+
+            # AWSCLI 2.x.x installation 
+            sudo apt-get install unzip -y
+            sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            sudo unzip awscliv2.zip
+            sudo ./aws/install
+            
+            # Install kubernetes
+            until KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text); do
+              if [  -z $KubernetesMasterPrivateIP  ]; then
+                sudo /usr/local/bin/aws configure set region us-east-1
+                KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
+              fi
+            done
+            IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+
+            until [($IS_MINIKUBE_UP == "livez check passed") ]
+            do
+                sleep 20
+                IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+            done
+            ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
+
+
+
+      BlockDeviceMappings:
+        - DeviceName:
+            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
+          Ebs:
+            VolumeSize: !Ref StorageInstance
+            DeleteOnTermination: true
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+       - Key: Name
+         Value: 'Allow kubernetes and admin ports'
+      GroupDescription: Allow kubernetes and admin ports
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 8090
+        ToPort: 8090
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 30000
+        ToPort: 32767
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 6443
+        ToPort: 6443
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 2379
+        ToPort: 2380
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 10250
+        ToPort: 10250
+        CidrIp: !Ref 'SSHLocation'
