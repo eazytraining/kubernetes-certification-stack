@@ -221,7 +221,7 @@ Resources:
        - Key: Name
          Value: 'worker1'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
       DependsOn: master
@@ -274,7 +274,7 @@ Resources:
         - Key: Name
           Value: 'worker2'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
       DependsOn: master
@@ -328,7 +328,7 @@ Resources:
         - Key: Name
           Value: 'worker3'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
       DependsOn: master
