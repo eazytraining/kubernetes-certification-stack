@@ -75,27 +75,58 @@ Conditions:
   CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-0057d8e6fb0692b80"]
 
 Resources:
-   Resources:
       ## VPC
-      PubVPC:
-        Type: AWS::EC2::VPC
-        Properties:
-          CidrBlock: 10.0.0.0/16
-          Tags:
-          - Key: Name
-            Value: 'Kubernetes-VPC'
+  PubVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: 'Kubernetes-VPC'
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: 'Kubernetes-IGW'
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref PubVPC
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref PubVPC
+      Tags:
+      - Key: Name
+        Value: "Kubernetes-route"
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+    
+  PubSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref PubVPC
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: Name
+        Value: 'Kubernetes-subnet'
 
-      ## SUBNETS     
-      PublicSubnet:
-        Type: AWS::EC2::Subnet
-        Properties:
-          VpcId: !Ref PubVPC
-          AvailabilityZone: us-east-1a
-          CidrBlock: 10.0.1.0/24
-          MapPublicIpOnLaunch: true
-          Tags:
-          - Key: Name
-            Value: 'Kubernetes-subnet'
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PubSubnet 
 
   ec2RoleDescribeInstance:
     Type: 'AWS::IAM::Role'
@@ -137,9 +168,10 @@ Resources:
        - Key: Name
          Value: 'master'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
+      VpcId: !Ref PubVPC 
       IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
       KeyName: !Ref 'KeyName'
       UserData:
@@ -192,6 +224,8 @@ Resources:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
+      DependsOn: master
+      VpcId: !Ref PubVPC 
       IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
       KeyName: !Ref 'KeyName'
       UserData:
@@ -215,12 +249,12 @@ Resources:
                 KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
               fi
             done
-            IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+            IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
 
             until [($IS_MINIKUBE_UP == "livez check passed") ]
             do
                 sleep 20
-                IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+                IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
             done
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
 
@@ -243,6 +277,8 @@ Resources:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
+      DependsOn: master
+      VpcId: !Ref PubVPC 
       IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
       KeyName: !Ref 'KeyName'
       UserData:
@@ -266,12 +302,12 @@ Resources:
                 KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
               fi
             done
-            IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+            IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
 
             until [($IS_MINIKUBE_UP == "livez check passed") ]
             do
                 sleep 20
-                IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+                IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
             done
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
 
@@ -295,6 +331,8 @@ Resources:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0057d8e6fb0692b80', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       SecurityGroups: [!Ref 'SecurityGroup']
+      DependsOn: master
+      VpcId: !Ref PubVPC 
       IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
       KeyName: !Ref 'KeyName'
       UserData:
@@ -318,12 +356,12 @@ Resources:
                 KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
               fi
             done
-            IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+            IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
 
             until [($IS_MINIKUBE_UP == "livez check passed") ]
             do
                 sleep 20
-                IS_MINIKUBE_UP=$(curl -k https://${KubernetesMasterPrivateIP}:6443/livez?verbose | grep -i "livez check passed")
+                IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
             done
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
 
