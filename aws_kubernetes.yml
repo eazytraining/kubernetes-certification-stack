@@ -75,6 +75,28 @@ Conditions:
   CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-0057d8e6fb0692b80"]
 
 Resources:
+   Resources:
+      ## VPC
+      PubVPC:
+        Type: AWS::EC2::VPC
+        Properties:
+          CidrBlock: 10.0.0.0/16
+          Tags:
+          - Key: Name
+            Value: 'Kubernetes-VPC'
+
+      ## SUBNETS     
+      PublicSubnet:
+        Type: AWS::EC2::Subnet
+        Properties:
+          VpcId: !Ref PubVPC
+          AvailabilityZone: us-east-1a
+          CidrBlock: 10.0.1.0/24
+          MapPublicIpOnLaunch: true
+          Tags:
+          - Key: Name
+            Value: 'Kubernetes-subnet'
+
   ec2RoleDescribeInstance:
     Type: 'AWS::IAM::Role'
     Properties:
@@ -288,7 +310,7 @@ Resources:
             sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             sudo unzip awscliv2.zip
             sudo ./aws/install
-            
+
             # Install kubernetes
             until KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text); do
               if [  -z $KubernetesMasterPrivateIP  ]; then
