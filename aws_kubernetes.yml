@@ -216,7 +216,7 @@ Resources:
   Instance1:
     Condition: Launch1
     Type: AWS::EC2::Instance
-    DependsOn: !Ref master
+    DependsOn: Master
     Properties:
       Tags:
        - Key: Name
@@ -269,7 +269,7 @@ Resources:
   Instance2:
     Condition: Launch2
     Type: AWS::EC2::Instance
-    DependsOn: !Ref master
+    DependsOn: Master
     Properties:
       Tags:
         - Key: Name
@@ -323,7 +323,7 @@ Resources:
   Instance3:
     Condition: Launch3
     Type: AWS::EC2::Instance
-    DependsOn: !Ref master
+    DependsOn: Master
     Properties:
       Tags:
         - Key: Name
