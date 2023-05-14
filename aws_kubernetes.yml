@@ -38,7 +38,7 @@ Parameters:
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=control_plane kubernetes_apiserver_advertise_address=$ec2_private_ip installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}'" -e "{'kubernetes_pod_network': {'cni': 'aws-k8s-cni', 'cidr': '192.168.99.0/24'}}"
             yum install bash-completion -y && kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
             aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 602401143452.dkr.ecr.us-west-2.amazonaws.com
-            kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/master/aws-k8s-cni.yaml
+            kubectl apply -f https://github.com/aws/amazon-vpc-cni-k8s/blob/release-1.12/config/master/aws-k8s-cni.yaml
             echo "###################################################"
             echo "Installation completed !!!!!"
             echo "###################################################"
