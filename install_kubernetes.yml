@@ -60,7 +60,13 @@
       state: installed
   - name: update time
     service: name=ntpd state=restarted
-    
+  - name: ipforward to 1
+    sysctl:
+      name: net.ipv4.ip_forward
+      value: '1'
+      sysctl_set: true
+      state: present
+      
   roles:
     - role: geerlingguy.pip
     - role: geerlingguy.containerd

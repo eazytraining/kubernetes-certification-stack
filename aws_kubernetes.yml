@@ -35,14 +35,20 @@ Parameters:
             ansible-galaxy install -r roles/requirements.yml
             ec2_private_ip=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
             export KUBECONFIG=/etc/kubernetes/admin.conf
-            ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=control_plane kubernetes_apiserver_advertise_address=$ec2_private_ip installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}'"
+            ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=control_plane kubernetes_apiserver_advertise_address=$ec2_private_ip installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}'" -e "{'kubernetes_pod_network': {'cni': 'aws-k8s-cni', 'cidr': '192.168.99.0/24'}}"
             yum install bash-completion -y && kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
+            aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 602401143452.dkr.ecr.us-west-2.amazonaws.com
+            kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/master/aws-k8s-cni.yaml
+            echo "###################################################"
+            echo "Installation completed !!!!!"
+            echo "###################################################"
   workerData:
       Type: String
       Default: |
             #!/bin/bash
             LOG_FILE=/var/log/kubernetes.log
             exec > >(tee ${LOG_FILE}) 2>&1
+            aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 602401143452.dkr.ecr.us-west-2.amazonaws.com
             sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
             sudo service sshd restart
             sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
@@ -81,7 +87,9 @@ Parameters:
             KUBERNETES_VERSION=1.26.1
             ansible-galaxy install -r roles/requirements.yml
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
-
+            echo "###################################################"
+            echo "Installation completed !!!!!"
+            echo "###################################################"
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
     Type: AWS::EC2::KeyPair::KeyName
@@ -198,6 +206,8 @@ Resources:
       Tags:
       - Key: Name
         Value: 'Kubernetes-subnet'
+      - Key: kubernetes.io/role/elb
+        Value: 1
 
   PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -235,9 +245,185 @@ Resources:
           - Effect: Allow
             Action: 'ec2:DescribeInstances'
             Resource: '*'
+          - Effect: Allow
+            Action: 
+              - 'ec2:AssignPrivateIpAddresses'
+              - 'ec2:AttachNetworkInterface'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeTags'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DescribeInstanceTypes'
+              - 'ec2:DetachNetworkInterface'
+              - 'ec2:ModifyNetworkInterfaceAttribute'
+              - 'ec2:UnassignPrivateIpAddresses'
+            Resource: '*'
+          - Effect: Allow
+            Action: 'ecr:*'
+            Resource: '*'
+          - Effect: Allow
+            Action: 'ec2:CreateTags'
+            Resource: 'arn:aws:ec2:*:*:network-interface/*'
+        
       Roles:
         - !Ref ec2RoleDescribeInstance
-
+  awsLoadBalancerController:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: awsLoadBalancerController
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'iam:CreateServiceLinkedRole'
+              - 'ec2:DescribeAccountAttributes'
+              - 'ec2:DescribeAddresses'
+              - 'ec2:DescribeAvailabilityZones'
+              - 'ec2:DescribeInternetGateways'
+              - 'ec2:DescribeVpcs'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeSecurityGroups'
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DescribeTags'
+              - 'ec2:GetCoipPoolUsage'
+              - 'ec2:DescribeCoipPools'
+              - 'elasticloadbalancing:DescribeLoadBalancers'
+              - 'elasticloadbalancing:DescribeLoadBalancerAttributes'
+              - 'elasticloadbalancing:DescribeListeners'
+              - 'elasticloadbalancing:DescribeListenerCertificates'
+              - 'elasticloadbalancing:DescribeSSLPolicies'
+              - 'elasticloadbalancing:DescribeRules'
+              - 'elasticloadbalancing:DescribeTargetGroups'
+              - 'elasticloadbalancing:DescribeTargetGroupAttributes'
+              - 'elasticloadbalancing:DescribeTargetHealth'
+              - 'elasticloadbalancing:DescribeTags'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'cognito-idp:DescribeUserPoolClient'
+              - 'acm:ListCertificates'
+              - 'acm:DescribeCertificate'
+              - 'iam:ListServerCertificates'
+              - 'iam:GetServerCertificate'
+              - 'waf-regional:GetWebACL'
+              - 'waf-regional:GetWebACLForResource'
+              - 'waf-regional:AssociateWebACL'
+              - 'waf-regional:DisassociateWebACL'
+              - 'wafv2:GetWebACL'
+              - 'wafv2:GetWebACLForResource'
+              - 'wafv2:AssociateWebACL'
+              - 'wafv2:DisassociateWebACL'
+              - 'shield:GetSubscriptionState'
+              - 'shield:DescribeProtection'
+              - 'shield:CreateProtection'
+              - 'shield:DeleteProtection'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ec2:AuthorizeSecurityGroupIngress'
+              - 'ec2:RevokeSecurityGroupIngress'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ec2:CreateSecurityGroup'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ec2:CreateTags'
+            Resource: 'arn:aws:ec2:*:*:security-group/*'
+            Condition:
+              StringEquals:
+                'ec2:CreateAction': CreateSecurityGroup
+              'Null':
+                'aws:RequestTag/elbv2.k8s.aws/cluster': 'false'
+          - Effect: Allow
+            Action:
+              - 'ec2:CreateTags'
+              - 'ec2:DeleteTags'
+            Resource: 'arn:aws:ec2:*:*:security-group/*'
+            Condition:
+              'Null':
+                'aws:RequestTag/elbv2.k8s.aws/cluster': 'true'
+                'aws:ResourceTag/elbv2.k8s.aws/cluster': 'false'
+          - Effect: Allow
+            Action:
+              - 'ec2:AuthorizeSecurityGroupIngress'
+              - 'ec2:RevokeSecurityGroupIngress'
+              - 'ec2:DeleteSecurityGroup'
+            Resource: '*'
+            Condition:
+              'Null':
+                'aws:ResourceTag/elbv2.k8s.aws/cluster': 'false'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:CreateLoadBalancer'
+              - 'elasticloadbalancing:CreateTargetGroup'
+            Resource: '*'
+            Condition:
+              'Null':
+                'aws:RequestTag/elbv2.k8s.aws/cluster': 'false'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:CreateListener'
+              - 'elasticloadbalancing:DeleteListener'
+              - 'elasticloadbalancing:CreateRule'
+              - 'elasticloadbalancing:DeleteRule'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:AddTags'
+              - 'elasticloadbalancing:RemoveTags'
+            Resource:
+              - 'arn:aws:elasticloadbalancing:*:*:targetgroup/*/*'
+              - 'arn:aws:elasticloadbalancing:*:*:loadbalancer/net/*/*'
+              - 'arn:aws:elasticloadbalancing:*:*:loadbalancer/app/*/*'
+            Condition:
+              'Null':
+                'aws:RequestTag/elbv2.k8s.aws/cluster': 'true'
+                'aws:ResourceTag/elbv2.k8s.aws/cluster': 'false'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:AddTags'
+              - 'elasticloadbalancing:RemoveTags'
+            Resource:
+              - 'arn:aws:elasticloadbalancing:*:*:listener/net/*/*/*'
+              - 'arn:aws:elasticloadbalancing:*:*:listener/app/*/*/*'
+              - 'arn:aws:elasticloadbalancing:*:*:listener-rule/net/*/*/*'
+              - 'arn:aws:elasticloadbalancing:*:*:listener-rule/app/*/*/*'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:ModifyLoadBalancerAttributes'
+              - 'elasticloadbalancing:SetIpAddressType'
+              - 'elasticloadbalancing:SetSecurityGroups'
+              - 'elasticloadbalancing:SetSubnets'
+              - 'elasticloadbalancing:DeleteLoadBalancer'
+              - 'elasticloadbalancing:ModifyTargetGroup'
+              - 'elasticloadbalancing:ModifyTargetGroupAttributes'
+              - 'elasticloadbalancing:DeleteTargetGroup'
+            Resource: '*'
+            Condition:
+              'Null':
+                'aws:ResourceTag/elbv2.k8s.aws/cluster': 'false'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:RegisterTargets'
+              - 'elasticloadbalancing:DeregisterTargets'
+            Resource: 'arn:aws:elasticloadbalancing:*:*:targetgroup/*/*'
+          - Effect: Allow
+            Action:
+              - 'elasticloadbalancing:SetWebAcl'
+              - 'elasticloadbalancing:ModifyListener'
+              - 'elasticloadbalancing:AddListenerCertificates'
+              - 'elasticloadbalancing:RemoveListenerCertificates'
+              - 'elasticloadbalancing:ModifyRule'
+            Resource: '*'
+        
+      Roles:
+        - !Ref ec2RoleDescribeInstance
+          
   Master:
     Type: AWS::EC2::Instance
     Properties:
@@ -397,4 +583,8 @@ Resources:
       - IpProtocol: tcp
         FromPort: 10250
         ToPort: 10250
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: icmp
+        FromPort: -1
+        ToPort: -1
         CidrIp: !Ref 'SSHLocation'
