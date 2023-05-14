@@ -67,6 +67,7 @@ Parameters:
             until [ "$IS_MINIKUBE_UP" == "livez check passed" ]
             do
                 sleep 60
+                echo "verify that master node is ready ..."
                 IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
             done
 
