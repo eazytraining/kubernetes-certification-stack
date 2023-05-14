@@ -614,3 +614,11 @@ Resources:
         FromPort: -1
         ToPort: -1
         CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 53
+        ToPort: 53
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: udp
+        FromPort: 53
+        ToPort: 53
+        CidrIp: !Ref 'SSHLocation'
