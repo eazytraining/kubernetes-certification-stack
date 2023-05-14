@@ -70,7 +70,7 @@
     shell: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\\        - --iface=enp0s8' | kubectl apply -f -"
     register: flannel_result
     changed_when: "'created' in flannel_result.stdout"
-    when: kubernetes_pod_network.cni == 'flannel' and kubernetes_role == 'control_plane' and installation_method == 'vagrant'"
+    when: kubernetes_pod_network.cni == 'flannel' and kubernetes_role == 'control_plane' and installation_method == 'vagrant'
     retries: 3
     delay: 5
     
