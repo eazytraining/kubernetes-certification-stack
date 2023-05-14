@@ -20,7 +20,7 @@ Parameters:
             yum -y install epel-release
             
             # AWSCLI 2.x.x installation 
-            sudo yum install unzip -y
+            sudo yum install unzip wget -y
             sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             sudo unzip awscliv2.zip
             sudo ./aws/install
@@ -70,7 +70,7 @@ Parameters:
             yum -y install epel-release
 
             # AWSCLI 2.x.x installation 
-            sudo yum install unzip -y
+            sudo yum install unzip wget -y
             sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             sudo unzip awscliv2.zip
             sudo ./aws/install
@@ -621,4 +621,8 @@ Resources:
       - IpProtocol: udp
         FromPort: 53
         ToPort: 53
+        CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
         CidrIp: !Ref 'SSHLocation'
