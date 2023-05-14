@@ -155,7 +155,7 @@ Resources:
   PubVPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.0.0.0/16
+      CidrBlock: 192.168.0.0/16
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
@@ -192,7 +192,7 @@ Resources:
     Properties:
       VpcId: !Ref PubVPC
       AvailabilityZone: us-east-1a
-      CidrBlock: 10.0.1.0/24
+      CidrBlock: 192.168.99.0/24
       MapPublicIpOnLaunch: true
       Tags:
       - Key: Name
