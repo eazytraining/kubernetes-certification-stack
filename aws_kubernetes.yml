@@ -10,6 +10,9 @@ Parameters:
             #!/bin/bash
             LOG_FILE=/var/log/kubernetes.log
             exec > >(tee ${LOG_FILE}) 2>&1
+            sudo echo nameserver 8.8.8.8 | sudo tee /etc/resolv.conf
+            sed -i '/\[main\]/a dns=none' /etc/NetworkManager/NetworkManager.conf
+            sudo systemctl restart NetworkManager.service
             sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
             sudo service sshd restart
             sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
@@ -36,9 +39,18 @@ Parameters:
             ec2_private_ip=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
             export KUBECONFIG=/etc/kubernetes/admin.conf
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=control_plane kubernetes_apiserver_advertise_address=$ec2_private_ip installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}'" -e "{'kubernetes_pod_network': {'cni': 'aws-k8s-cni', 'cidr': '192.168.99.0/24'}}"
+            
             yum install bash-completion -y && kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
-            aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 602401143452.dkr.ecr.us-west-2.amazonaws.com
-            kubectl apply -f https://github.com/aws/amazon-vpc-cni-k8s/blob/release-1.12/config/master/aws-k8s-cni.yaml
+            PASSWORD=$(aws ecr get-login-password --region us-west-2)
+            cat <<EOT >> /etc/crictl.yaml
+            runtime-endpoint: unix:///var/run/containerd/containerd.sock
+            image-endpoint: unix:///var/run/containerd/containerd.sock
+            EOT
+
+            crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.12.6
+            crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.12.6
+            kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/master/aws-k8s-cni.yaml
+
             echo "###################################################"
             echo "Installation completed !!!!!"
             echo "###################################################"
@@ -48,7 +60,9 @@ Parameters:
             #!/bin/bash
             LOG_FILE=/var/log/kubernetes.log
             exec > >(tee ${LOG_FILE}) 2>&1
-            aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 602401143452.dkr.ecr.us-west-2.amazonaws.com
+            sudo echo nameserver 8.8.8.8 | sudo tee /etc/resolv.conf
+            sed -i '/\[main\]/a dns=none' /etc/NetworkManager/NetworkManager.conf
+            sudo systemctl restart NetworkManager.service
             sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
             sudo service sshd restart
             sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
@@ -87,6 +101,15 @@ Parameters:
             KUBERNETES_VERSION=1.26.1
             ansible-galaxy install -r roles/requirements.yml
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
+
+            PASSWORD=$(aws ecr get-login-password --region us-west-2)
+            cat <<EOT >> /etc/crictl.yaml
+            runtime-endpoint: unix:///var/run/containerd/containerd.sock
+            image-endpoint: unix:///var/run/containerd/containerd.sock
+            EOT
+            crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.12.6
+            crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.12.6
+
             echo "###################################################"
             echo "Installation completed !!!!!"
             echo "###################################################"
@@ -130,18 +153,21 @@ Parameters:
 
   ImageTypeInstance:
     Description: image type for instance server
-    Default: "CentOS Linux 7 (Core) - ami-0edbfff0e16c93884"
+    Default: "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"
     Type: String
     AllowedValues:
 #      - "Debian GNU/Linux 9 (stretch) - ami-003f19e0e687de1cd"
-      - "CentOS Linux 7 (Core) - ami-0edbfff0e16c93884"
+      - "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"
     ConstraintDescription: must specify debian or centos
 
   StorageInstance:
     Description: Storage size (Go) for Remote server
-    Default: "60"
+    Default: "20"
     Type: String
     AllowedValues:
+      - "10"
+      - "20"
+      - "40"
       - "60"
       - "80"
       - "100"
@@ -157,7 +183,7 @@ Conditions:
   Launch3: !Equals [3, !Ref InstanceCount]
 
   DebianImageInstance: !Equals [!Ref ImageTypeInstance, "Debian GNU/Linux 9 (stretch) - ami-003f19e0e687de1cd"]
-  CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-0edbfff0e16c93884"]
+  CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"]
 
 Resources:
       ## VPC
@@ -431,7 +457,7 @@ Resources:
        - Key: Name
          Value: 'master'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0edbfff0e16c93884', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
@@ -461,7 +487,7 @@ Resources:
        - Key: Name
          Value: 'worker1'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0edbfff0e16c93884', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
@@ -492,7 +518,7 @@ Resources:
         - Key: Name
           Value: 'worker2'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0edbfff0e16c93884', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
@@ -522,7 +548,7 @@ Resources:
         - Key: Name
           Value: 'worker3'
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0edbfff0e16c93884', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
