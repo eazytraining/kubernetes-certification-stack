@@ -630,3 +630,7 @@ Resources:
         FromPort: 9443
         ToPort: 9443
         CidrIp: !Ref 'SSHLocation'
+      - IpProtocol: tcp
+        FromPort: 8443
+        ToPort: 8443
+        CidrIp: !Ref 'SSHLocation'
