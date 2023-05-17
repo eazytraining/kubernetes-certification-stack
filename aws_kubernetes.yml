@@ -195,13 +195,13 @@ Resources:
       EnableDnsHostnames: true
       Tags:
       - Key: Name
-        Value: 'Kubernetes-VPC'
+        Value: !Join ["-", [!Ref AWS::StackName, VPC]]
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
       - Key: Name
-        Value: 'Kubernetes-IGW'
+        Value: !Join ["-", [!Ref AWS::StackName, IGW]]
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
@@ -213,7 +213,7 @@ Resources:
       VpcId: !Ref PubVPC
       Tags:
       - Key: Name
-        Value: "Kubernetes-route"
+        Value: !Join ["-", [!Ref AWS::StackName, route]]
   DefaultPublicRoute:
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
@@ -231,7 +231,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
       - Key: Name
-        Value: 'Kubernetes-subnet'
+        Value: !Join ["-", [!Ref AWS::StackName, subnet]]
       - Key: kubernetes.io/role/elb
         Value: 1
 
@@ -264,7 +264,7 @@ Resources:
   ec2RolePoliciesDescribeInstance:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: ec2RoleDescribeInstance
+      PolicyName: !Join ["-", [!Ref AWS::StackName, ec2RoleDescribeInstance]]
       PolicyDocument:
         Statement:
             #Allow permission to describe all ec2 instances
@@ -297,7 +297,7 @@ Resources:
   awsLoadBalancerController:
     Type: 'AWS::IAM::Policy'
     Properties:
-      PolicyName: awsLoadBalancerController
+      PolicyName: !Join ["-", [!Ref AWS::StackName, awsLoadBalancerController]]
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -455,7 +455,7 @@ Resources:
     Properties:
       Tags:
        - Key: Name
-         Value: 'master'
+         Value: !Join ["-", [!Ref AWS::StackName, master]]
       ImageId:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
@@ -485,7 +485,7 @@ Resources:
     Properties:
       Tags:
        - Key: Name
-         Value: 'worker1'
+         Value: !Join ["-", [!Ref AWS::StackName, worker2]]
       ImageId:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
@@ -516,7 +516,7 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: 'worker2'
+          Value: !Join ["-", [!Ref AWS::StackName, worker2]]
       ImageId:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
@@ -546,7 +546,7 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: 'worker3'
+          Value: !Join ["-", [!Ref AWS::StackName, worker3]]
       ImageId:
         !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
       InstanceType: !Ref InstanceTypeInstance
@@ -575,7 +575,7 @@ Resources:
       VpcId: !Ref PubVPC
       Tags:
        - Key: Name
-         Value: 'Allow kubernetes and admin ports'
+         Value: !Join ["-", [!Ref AWS::StackName, AllowKubePort]]
       GroupDescription: Allow kubernetes and admin ports
       SecurityGroupIngress:
       - IpProtocol: tcp
