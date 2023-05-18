@@ -76,19 +76,21 @@ Parameters:
             sudo ./aws/install
 
             # Install kubernetes
-            until KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text); do
+            STACK_NAME=$(curl --silent http://169.254.169.254/latest/meta-data/tags/instance/Name)
+            MASTER_EC2_NAME=$(echo ${STACK_NAME%-worker*}-master)
+            until KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=$MASTER_EC2_NAME Name=instance-state-name,Values=running --output text); do
               if [  -z $KubernetesMasterPrivateIP  ]; then
                 sudo /usr/local/bin/aws configure set region us-east-1
-                KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=master Name=instance-state-name,Values=running --output text)
+                KubernetesMasterPrivateIP=$(/usr/local/bin/aws ec2 describe-instances --query "Reservations[*].Instances[*].[PrivateIpAddress]" --filters Name=tag:Name,Values=$MASTER_EC2_NAME Name=instance-state-name,Values=running --output text)
               fi
             done
-            IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
+            IS_KUBERNETES_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
 
-            until [ "$IS_MINIKUBE_UP" == "livez check passed" ]
+            until [ "$IS_KUBERNETES_UP" == "livez check passed" ]
             do
                 sleep 60
                 echo "verify that master node is ready ..."
-                IS_MINIKUBE_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
+                IS_KUBERNETES_UP=$(curl -k https://$KubernetesMasterPrivateIP:6443/livez?verbose | grep -i "livez check passed")
             done
 
             # install ansible
@@ -186,7 +188,37 @@ Conditions:
   CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"]
 
 Resources:
-      ## VPC
+  workerLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Join ["-", [!Ref AWS::StackName, workerLaunchTemplate]]
+      LaunchTemplateData:
+        MetadataOptions: 
+          InstanceMetadataTags: "enabled"
+        ImageId:
+          !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
+        InstanceType: !Ref InstanceTypeInstance
+        NetworkInterfaces: 
+          - AssociatePublicIpAddress: "true"
+            DeviceIndex: "0"
+            Groups: 
+              - Ref: "SecurityGroup"
+            SubnetId: 
+              Ref: "PubSubnet"
+        IamInstanceProfile:
+          Arn: !GetAtt
+            - ec2InstanceProfileDescribeInstance
+            - Arn      
+        KeyName: !Ref 'KeyName'
+        UserData: 
+          'Fn::Base64':
+            !Ref workerData
+        BlockDeviceMappings:
+          - DeviceName:
+              !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
+            Ebs:
+              VolumeSize: !Ref StorageInstance
+              DeleteOnTermination: true
   PubVPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -485,30 +517,10 @@ Resources:
     Properties:
       Tags:
        - Key: Name
-         Value: !Join ["-", [!Ref AWS::StackName, worker2]]
-      ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
-      InstanceType: !Ref InstanceTypeInstance
-      NetworkInterfaces: 
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          GroupSet: 
-            - Ref: "SecurityGroup"
-          SubnetId: 
-            Ref: "PubSubnet"
-      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
-      KeyName: !Ref 'KeyName'
-      UserData: 
-        'Fn::Base64':
-          !Ref workerData
-
-      BlockDeviceMappings:
-        - DeviceName:
-            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
-          Ebs:
-            VolumeSize: !Ref StorageInstance
-            DeleteOnTermination: true
-
+         Value: !Join ["-", [!Ref AWS::StackName, worker1]]
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref workerLaunchTemplate
+        Version: !GetAtt workerLaunchTemplate.LatestVersionNumber
   Instance2:
     Condition: Launch2
     Type: AWS::EC2::Instance
@@ -517,28 +529,9 @@ Resources:
       Tags:
         - Key: Name
           Value: !Join ["-", [!Ref AWS::StackName, worker2]]
-      ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
-      InstanceType: !Ref InstanceTypeInstance
-      NetworkInterfaces: 
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          GroupSet: 
-            - Ref: "SecurityGroup"
-          SubnetId: 
-            Ref: "PubSubnet"
-      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
-      KeyName: !Ref 'KeyName'
-      UserData: 
-        'Fn::Base64':
-          !Ref workerData
-      BlockDeviceMappings:
-        - DeviceName:
-            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
-          Ebs:
-            VolumeSize: !Ref StorageInstance
-            DeleteOnTermination: true
-
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref workerLaunchTemplate
+        Version: !GetAtt workerLaunchTemplate.LatestVersionNumber
   Instance3:
     Condition: Launch3
     Type: AWS::EC2::Instance
@@ -547,27 +540,9 @@ Resources:
       Tags:
         - Key: Name
           Value: !Join ["-", [!Ref AWS::StackName, worker3]]
-      ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
-      InstanceType: !Ref InstanceTypeInstance
-      NetworkInterfaces: 
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          GroupSet: 
-            - Ref: "SecurityGroup"
-          SubnetId: 
-            Ref: "PubSubnet"
-      IamInstanceProfile: !Ref ec2InstanceProfileDescribeInstance      
-      KeyName: !Ref 'KeyName'
-      UserData: 
-        'Fn::Base64':
-          !Ref workerData
-      BlockDeviceMappings:
-        - DeviceName:
-            !If [DebianImageInstance, xvda, !If [CentosImageInstance, /dev/sda1, ' ']]
-          Ebs:
-            VolumeSize: !Ref StorageInstance
-            DeleteOnTermination: true
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref workerLaunchTemplate
+        Version: !GetAtt workerLaunchTemplate.LatestVersionNumber
 
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -609,10 +584,6 @@ Resources:
       - IpProtocol: tcp
         FromPort: 10250
         ToPort: 10250
-        CidrIp: !Ref 'SSHLocation'
-      - IpProtocol: icmp
-        FromPort: -1
-        ToPort: -1
         CidrIp: !Ref 'SSHLocation'
       - IpProtocol: tcp
         FromPort: 53
