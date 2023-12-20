@@ -8,8 +8,10 @@
     kubernetes_pod_network:
       cni: 'flannel'
       cidr: '10.244.0.0/16'
-    kubernetes_yum_gpg_check: false
-    kubernetes_yum_repo_gpg_check: false
+    kubernetes_yum_gpg_check: true
+    kubernetes_yum_repo_gpg_check: true
+    kubernetes_yum_base_url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}/rpm/"
+    kubernetes_yum_gpg_key: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}/rpm/repodata/repomd.xml.key"
     kubernetes_kubelet_extra_args: "--node-ip={{ ansible_enp0s8.ipv4.address }}"
     kubernetes_config_kubelet_configuration:
       cgroupDriver: "systemd"
