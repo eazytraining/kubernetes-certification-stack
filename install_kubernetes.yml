@@ -82,6 +82,15 @@
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
     - role: geerlingguy.kubernetes
+      kubernetes_packages:
+        - name: kubelet-{{ kubernetes_version_rhel_package }}
+          state: present
+        - name: kubectl-{{ kubernetes_version_rhel_package }}
+          state: present
+        - name: kubeadm-{{ kubernetes_version_rhel_package }}
+          state: present
+        - name: kubernetes-cni
+          state: present
   post_tasks:
   - name: Configure Flannel networking for enp0s8
     shell: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\\        - --iface=enp0s8' | kubectl apply -f -"
