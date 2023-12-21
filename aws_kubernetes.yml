@@ -34,7 +34,7 @@ Parameters:
             rm -Rf kubernetes-certification-stack || echo "previous folder removed"
             git clone https://github.com/eazytraining/kubernetes-certification-stack.git
             cd kubernetes-certification-stack
-            KUBERNETES_VERSION=1.26.1
+            KUBERNETES_VERSION=1.28.1
             ansible-galaxy install -r roles/requirements.yml
             ec2_private_ip=$(curl http://169.254.169.254/latest/meta-data/local-ipv4)
             export KUBECONFIG=/etc/kubernetes/admin.conf
