@@ -8,8 +8,14 @@
     kubernetes_pod_network:
       cni: 'flannel'
       cidr: '10.244.0.0/16'
-    kubernetes_yum_gpg_check: false
-    kubernetes_yum_repo_gpg_check: false
+    #kubernetes_yum_gpg_check: false
+    #kubernetes_yum_repo_gpg_check: false
+    # Change the value false to true beacause we have now the stable version of update process
+    kubernetes_yum_gpg_check: true
+    kubernetes_yum_repo_gpg_check: true
+    kubernetes_yum_base_url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}/rpm/"
+    kubernetes_yum_gpg_key: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}/rpm/repodata/repomd.xml.key"
+    kubernetes_version: "{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}"
     kubernetes_kubelet_extra_args: "--node-ip={{ ansible_enp0s8.ipv4.address }}"
     kubernetes_config_kubelet_configuration:
       cgroupDriver: "systemd"
@@ -71,6 +77,15 @@
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
     - role: geerlingguy.kubernetes
+        kubernetes_packages:
+        - name: kubelet-{{ kubernetes_version_rhel_package }}
+          state: present
+        - name: kubectl-{{ kubernetes_version_rhel_package }}
+          state: present
+        - name: kubeadm-{{ kubernetes_version_rhel_package }}
+          state: present
+        - name: kubernetes-cni
+          state: present
   post_tasks:
   - name: Configure Flannel networking for enp0s8
     shell: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\\        - --iface=enp0s8' | kubectl apply -f -"
