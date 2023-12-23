@@ -49,7 +49,7 @@ Parameters:
 
             crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.12.6
             crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.12.6
-            kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/master/config/master/aws-k8s-cni.yaml
+            kubectl apply -f https://raw.githubusercontent.com/aws/amazon-vpc-cni-k8s/release-1.12/config/master/aws-k8s-cni.yaml
 
             echo "###################################################"
             echo "Installation completed !!!!!"
