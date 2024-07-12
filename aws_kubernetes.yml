@@ -16,6 +16,9 @@ Parameters:
             sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config
             sudo service sshd restart
             sudo chpasswd <<<"centos:a231e83092beedf5c757691a1e26462a"
+            sudo sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+            sudo sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+            sudo sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
             yum -y update
             yum -y install epel-release
             
