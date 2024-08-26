@@ -44,11 +44,11 @@ Parameters:
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=control_plane kubernetes_apiserver_advertise_address=$ec2_private_ip installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}'" -e "{'kubernetes_pod_network': {'cni': 'aws-k8s-cni', 'cidr': '192.168.99.0/24'}}"
             
             yum install bash-completion -y && kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
-            PASSWORD=$(aws ecr get-login-password --region us-west-2)
-            cat <<EOT >> /etc/crictl.yaml
+            PASSWORD=$(/usr/local/bin/aws ecr get-login-password --region us-west-2)
+            sudo bash -c 'echo "
             runtime-endpoint: unix:///var/run/containerd/containerd.sock
             image-endpoint: unix:///var/run/containerd/containerd.sock
-            EOT
+            " >> /etc/crictl.yaml'
 
             crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.12.6
             crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.12.6
@@ -72,6 +72,7 @@ Parameters:
             sudo sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
             sudo sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
             sudo sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+            yum -y update
             yum -y update
             yum -y install epel-release
 
@@ -104,17 +105,17 @@ Parameters:
             # retrieve ansible code
             yum -y install git
             rm -Rf kubernetes-certification-stack || echo "previous folder removed"
-            git clone -b v1.30 https://github.com/eazytraining/kubernetes-certification-stack.git 
+            git clone https://github.com/eazytraining/kubernetes-certification-stack.git
             cd kubernetes-certification-stack
             KUBERNETES_VERSION=1.30.1
             ansible-galaxy install -r roles/requirements.yml
             ansible-playbook install_kubernetes.yml --extra-vars "kubernetes_role=node kubernetes_apiserver_advertise_address=$KubernetesMasterPrivateIP installation_method=aws kubernetes_version_rhel_package='$KUBERNETES_VERSION' kubernetes_kubelet_extra_args='--node-ip={{ ansible_eth0.ipv4.address }}' kubernetes_join_command='kubeadm join {{ kubernetes_apiserver_advertise_address }}:6443 --ignore-preflight-errors=all --token={{ token }}  --discovery-token-unsafe-skip-ca-verification'"
 
-            PASSWORD=$(aws ecr get-login-password --region us-west-2)
-            cat <<EOT >> /etc/crictl.yaml
+            PASSWORD=$(/usr/local/bin/aws ecr get-login-password --region us-west-2)
+            sudo bash -c 'echo "
             runtime-endpoint: unix:///var/run/containerd/containerd.sock
             image-endpoint: unix:///var/run/containerd/containerd.sock
-            EOT
+            " >> /etc/crictl.yaml'
             crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.12.6
             crictl pull --creds "AWS:$PASSWORD" 602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.12.6
 
