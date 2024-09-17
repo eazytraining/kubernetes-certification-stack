@@ -1,12 +1,11 @@
 
 #!/bin/bash
 yum -y update
-yum -y install epel-release
 
 # install ansible
 yum -y install ansible
 # retrieve ansible code
-yum -y install git
+yum -y install git nfs-utils
 rm -Rf kubernetes-certification-stack || echo "previous folder removed"
 git clone -b v1.29 https://github.com/eazytraining/kubernetes-certification-stack.git
 cd kubernetes-certification-stack
