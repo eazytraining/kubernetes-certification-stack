@@ -9,8 +9,8 @@ yum -y install ansible
 yum -y install git
 rm -Rf kubernetes-certification-stack || echo "previous folder removed"
 git clone -b v1.31 https://github.com/eazytraining/kubernetes-certification-stack.git
-cd kubernetes-certification-stack
-KUBERNETES_VERSION=1.31.1
+cd kubernetes-certification-stack/centos7
+KUBERNETES_VERSION=1.32.1
 ansible-galaxy install -r roles/requirements.yml
 if [ $1 == "master" ]
 then
