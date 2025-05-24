@@ -1,15 +1,16 @@
 #!/bin/bash
 set -e
 
-# sudo apt remove --purge ansible
-sudo apt update -y 
-# sudo apt install python3-pip -y
-# pip3 install --user --upgrade ansible
-# export PATH=$HOME/.local/bin:$PATH
-# source ~/.bashrc   # ou source ~/.zshrc
+sudo apt update
+sudo apt install -y software-properties-common
 
-# install ansible and git
-sudo apt -y install ansible git
+# Ajouter le PPA d'Ansible
+echo "Ajout du PPA d'Ansible..."
+sudo add-apt-repository -y ppa:ansible/ansible
+
+sudo apt update
+# Installer Ansible
+sudo apt install -y ansible
 
 # Optionally, remove previous directory and retrieve project
 rm -Rf kubernetes-certification-stack || echo "previous folder removed"
