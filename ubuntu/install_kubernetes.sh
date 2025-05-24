@@ -4,13 +4,38 @@ set -e
 sudo apt update
 sudo apt install -y software-properties-common
 
-# Ajouter le PPA d'Ansible
-echo "Ajout du PPA d'Ansible..."
-sudo add-apt-repository -y ppa:ansible/ansible
+# # Ajouter le PPA d'Ansible
+# echo "Ajout du PPA d'Ansible..."
+# sudo add-apt-repository -y ppa:ansible/ansible
 
+# sudo apt update
+# # Installer Ansible
+# sudo apt install -y ansible
+
+sudo apt update && sudo apt upgrade -y
+echo "Installation des dépendances nécessaires..."
+sudo apt install -y software-properties-common wget build-essential libssl-dev zlib1g-dev \
+libbz2-dev libreadline-dev libsqlite3-dev curl llvm libncurses5-dev libncursesw5-dev \
+xz-utils tk-dev libffi-dev liblzma-dev python3-openssl git
+echo "Ajout du PPA pour Python 3.11..."
+sudo add-apt-repository ppa:deadsnakes/ppa -y
 sudo apt update
-# Installer Ansible
-sudo apt install -y ansible
+echo "Installation de Python 3.11 et ses modules..."
+sudo apt install -y python3.11 python3.11-venv python3.11-distutils python3.11-dev python3-pip
+echo "Vérification de la version Python installée..."
+python3.11 --version
+echo "Création d'un environnement virtuel Python 3.11..."
+python3.11 -m venv ~/ansible-env-py311
+echo "Activation de l'environnement virtuel..."
+source ~/ansible-env-py311/bin/activate
+echo "Mise à jour de pip dans l'environnement..."
+python -m pip install --upgrade pip
+echo "Installation d'Ansible compatible (ex: dernière stable)..."
+pip install "ansible>=2.14,<3"
+echo "Vérification de la version Ansible installée..."
+ansible --version
+echo "Installation terminée. Pour utiliser l'environnement, faites :"
+echo "source ~/ansible-env-py311/bin/activate"
 
 # Optionally, remove previous directory and retrieve project
 rm -Rf kubernetes-certification-stack || echo "previous folder removed"
