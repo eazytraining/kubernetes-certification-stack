@@ -19,7 +19,7 @@ cd kubernetes-certification-stack/ubuntu
 KUBERNETES_VERSION=1.32.1
 
 ansible-galaxy install -r roles/requirements.yml
-ansible-galaxy collection install -r roles/requirements.yml
+
 
 # Detect network interface (adapt if needed)
 IFACE="enp0s8"
