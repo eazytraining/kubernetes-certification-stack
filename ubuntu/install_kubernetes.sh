@@ -1,7 +1,12 @@
 #!/bin/bash
 set -e
 
+# sudo apt remove --purge ansible
 sudo apt update -y 
+# sudo apt install python3-pip -y
+# pip3 install --user --upgrade ansible
+# export PATH=$HOME/.local/bin:$PATH
+# source ~/.bashrc   # ou source ~/.zshrc
 
 # install ansible and git
 sudo apt -y install ansible git
@@ -14,6 +19,7 @@ cd kubernetes-certification-stack/ubuntu
 KUBERNETES_VERSION=1.32.1
 
 ansible-galaxy install -r roles/requirements.yml
+ansible-galaxy collection install -r roles/requirements.yml
 
 # Detect network interface (adapt if needed)
 IFACE="enp0s8"
