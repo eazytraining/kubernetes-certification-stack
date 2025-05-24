@@ -4,6 +4,7 @@
   vars:
     token: "783bde.3f89s0fje9f38fhf"
     swap_disabled: true
+    kubernetes_install_repo: false
 
     # Variables du rôle geerlingguy.kubernetes (conformes à defaults/main.yml)
     # kubernetes_install_repo: false
