@@ -10,7 +10,15 @@ sudo add-apt-repository -y ppa:ansible/ansible
 
 sudo apt update
 # Installer Ansible
-sudo apt install -y ansible
+# sudo apt install -y ansible
+sudo apt remove ansible -y
+sudo apt update
+sudo apt install python3-pip python3-venv -y
+python3 -m venv ~/ansible-venv
+source ~/ansible-venv/bin/activate
+pip install --upgrade pip
+pip install "ansible>=2.15"
+ansible --version   # Doit afficher 2.15 ou plus
 # Optionally, remove previous directory and retrieve project
 rm -Rf kubernetes-certification-stack || echo "previous folder removed"
 git clone -b v1.32 https://github.com/eazytraining/kubernetes-certification-stack.git
