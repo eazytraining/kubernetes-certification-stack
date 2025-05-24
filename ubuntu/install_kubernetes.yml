@@ -4,6 +4,7 @@
   vars:
     token: "783bde.3f89s0fje9f38fhf"
     swap_disabled: true
+    kubernetes_install_repo: false
 
     # Variables du rôle geerlingguy.kubernetes (conformes à defaults/main.yml)
     # kubernetes_install_repo: false
@@ -77,38 +78,38 @@
       apt:
         update_cache: yes
 
-    # - name: Install dependencies for Kubernetes repo
-    #   apt:
-    #     name:
-    #       - apt-transport-https
-    #       - ca-certificates
-    #       - curl
-    #       - gpg
-    #     state: present
-    #     update_cache: yes
+    - name: Install dependencies for Kubernetes repo
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+        update_cache: yes
 
-    # - name: Create keyrings directory if needed
-    #   file:
-    #     path: /etc/apt/keyrings
-    #     state: directory
-    #     mode: '0755'
+    - name: Create keyrings directory if needed
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
 
-    # - name: Download and dearmor Kubernetes GPG key
-    #   shell: |
-    #     curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-    #   args:
-    #     creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    - name: Download and dearmor Kubernetes GPG key
+      shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
-    # - name: Add Kubernetes apt repository
-    #   copy:
-    #     dest: /etc/apt/sources.list.d/kubernetes.list
-    #     content: |
-    #       deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /
-    #     mode: '0644'
+    - name: Add Kubernetes apt repository
+      copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /
+        mode: '0644'
 
-    # - name: Update apt cache after adding Kubernetes repo
-    #   apt:
-    #     update_cache: yes
+    - name: Update apt cache after adding Kubernetes repo
+      apt:
+        update_cache: yes
 
   roles:
     - role: geerlingguy.pip
