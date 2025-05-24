@@ -2,19 +2,48 @@
   become: true
 
   vars:
-    crictl_version: "v1.30.0"
+    token: "783bde.3f89s0fje9f38fhf"
+    swap_disabled: true
+
+    # Variables du rôle geerlingguy.kubernetes (conformes à defaults/main.yml)
+    # kubernetes_install_repo: false
     kubernetes_version: "1.31"
     kubernetes_role: control_plane
     kubernetes_allow_pods_on_control_plane: true
     kubernetes_pod_network:
       cni: 'flannel'
       cidr: '10.244.0.0/16'
+
     kubernetes_kubelet_extra_args: "--node-ip={{ ansible_default_ipv4.address }}"
+    kubernetes_kubeadm_kubelet_config_file_path: '/etc/kubernetes/kubeadm-kubelet-config.yaml'
+    kubernetes_config_kubelet_configuration:
+      cgroupDriver: "systemd"
+      failSwapOn: false
+    kubernetes_config_kube_proxy_configuration:
+      ipvs:
+        strictARP: true
+    kubernetes_config_init_configuration:
+      localAPIEndpoint:
+        advertiseAddress: "{{ kubernetes_apiserver_advertise_address | default(ansible_default_ipv4.address, true) }}"
+      bootstrapTokens:
+        - token: "{{ token }}"
+          description: "another bootstrap token"
+          usages:
+            - authentication
+            - signing
+          groups:
+            - system:bootstrappers:kubeadm:default-node-token
+
+    # Variables spécifiques Ubuntu/Debian
+    # kubernetes_apt_release_channel: "stable"
+    # kubernetes_apt_repository: "https://pkgs.k8s.io/core:/{{ kubernetes_apt_release_channel }}:/v{{ kubernetes_version }}/deb/"
     kubernetes_flannel_manifest_file: "https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml"
+    crictl_version: "v1.30.0"
 
   pre_tasks:
     - name: Update all packages (apt)
       apt:
+        # upgrade: dist
         update_cache: yes
 
     - name: Install ntp
@@ -33,8 +62,9 @@
         state: present
 
     - name: Disable swap
-      shell: swapoff -a
-      when: swap_disabled | default(true)
+      shell: |
+        swapoff -a
+      when: swap_disabled == true
 
     - name: Enable IP forwarding
       sysctl:
@@ -47,47 +77,80 @@
       apt:
         update_cache: yes
 
+    - name: Install dependencies for Kubernetes repo
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+        update_cache: yes
+
+    - name: Create keyrings directory if needed
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download and dearmor Kubernetes GPG key
+      shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes apt repository
+      copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /
+        mode: '0644'
+
+    - name: Update apt cache after adding Kubernetes repo
+      apt:
+        update_cache: yes
+
   roles:
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
     - role: geerlingguy.kubernetes
 
   post_tasks:
-  - name: Configure Flannel networking for enp0s8
-    shell: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\\        - --iface=enp0s8' | kubectl apply -f -"
-    register: flannel_result
-    changed_when: "'created' in flannel_result.stdout"
-    when: kubernetes_pod_network.cni == 'flannel' and kubernetes_role == 'control_plane' and installation_method == 'vagrant'
-    retries: 3
-    delay: 5
+    - name: Configure Flannel networking for enp0s8
+      shell: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\\        - --iface=enp0s8' | kubectl apply -f -"
+      register: flannel_result
+      changed_when: "'created' in flannel_result.stdout"
+      when: kubernetes_pod_network.cni == 'flannel' and kubernetes_role == 'control_plane'
+      retries: 3
+      delay: 5
 
-  - name: Download crictl binary
-    get_url:
-      url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_version }}/crictl-{{ crictl_version }}-linux-amd64.tar.gz"
-      dest: /tmp/crictl.tar.gz
+    - name: Download crictl binary
+      get_url:
+        url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_version }}/crictl-{{ crictl_version }}-linux-amd64.tar.gz"
+        dest: /tmp/crictl.tar.gz
 
-  - name: Extract crictl binary
-    ansible.builtin.unarchive:
-      src: /tmp/crictl.tar.gz
-      dest: /usr/local/bin
-      remote_src: yes
+    - name: Extract crictl binary
+      ansible.builtin.unarchive:
+        src: /tmp/crictl.tar.gz
+        dest: /usr/local/bin
+        remote_src: yes
 
-  - name: Remove crictl archive
-    ansible.builtin.file:
-      path: /tmp/crictl.tar.gz
-      state: absent
+    - name: Remove crictl archive
+      ansible.builtin.file:
+        path: /tmp/crictl.tar.gz
+        state: absent
 
-  - name: Create crictl configuration directory
-    ansible.builtin.file:
-      path: /etc/crictl.d
-      state: directory
+    - name: Create crictl configuration directory
+      ansible.builtin.file:
+        path: /etc/crictl.d
+        state: directory
 
-  - name: Configure crictl
-    ansible.builtin.copy:
-      content: |
-        runtime-endpoint: unix:///var/run/containerd/containerd.sock
-        image-endpoint: unix:///var/run/containerd/containerd.sock
-        timeout: 2
-        debug: true
-        pull-image-on-create: false
-      dest: /etc/crictl.yaml    
+    - name: Configure crictl
+      ansible.builtin.copy:
+        content: |
+          runtime-endpoint: unix:///var/run/containerd/containerd.sock
+          image-endpoint: unix:///var/run/containerd/containerd.sock
+          timeout: 2
+          debug: true
+          pull-image-on-create: false
+        dest: /etc/crictl.yaml
