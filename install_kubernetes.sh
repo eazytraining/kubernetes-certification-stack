@@ -1,14 +1,24 @@
 
 #!/bin/bash
-yum -y update
-yum -y install epel-release
+# 1. Mettre à jour la liste des paquets et appliquer les mises à jour disponibles
+sudo apt update && sudo apt -y upgrade
 
-# install ansible
-yum -y install ansible
-# retrieve ansible code
-yum -y install git
-rm -Rf kubernetes-certification-stack || echo "previous folder removed"
-git clone -b v1.31 https://github.com/eazytraining/kubernetes-certification-stack.git
+# 2. (Optionnel) Activer le dépôt Universe – l’équivalent le plus proche de « extras »
+#    – ainsi que le PPA officiel si vous souhaitez la dernière version stable d’Ansible
+sudo add-apt-repository universe
+sudo add-apt-repository --yes ppa:ansible/ansible
+sudo apt update            # Re-lecture des index après ajout de dépôts
+
+# 3. Installer Ansible
+sudo apt -y install ansible
+
+# 4. Installer Git (pour récupérer le code Ansible, par exemple)
+sudo apt -y install git
+
+# 5. Nettoyer un éventuel répertoire existant
+rm -rf kubernetes-certification-stack || echo "previous folder removed"
+
+git clone -b ubuntu https://github.com/eazytraining/kubernetes-certification-stack.git
 cd kubernetes-certification-stack
 KUBERNETES_VERSION=1.31.1
 ansible-galaxy install -r roles/requirements.yml

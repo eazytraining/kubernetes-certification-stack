@@ -7,11 +7,7 @@
     # The follow two parameter was explained here https://github.com/geerlingguy/ansible-role-kubernetes#variables-to-configure-kubeadm-and-kubelet-through-command-line-options
     kubernetes_pod_network:
       cni: 'flannel'
-      cidr: '10.244.0.0/16'
-    kubernetes_yum_gpg_check: true
-    kubernetes_yum_repo_gpg_check: true
-    kubernetes_yum_base_url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}/rpm/"
-    kubernetes_yum_gpg_key: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}/rpm/repodata/repomd.xml.key"
+      cidr: '10.244.0.0/16'  
     kubernetes_version: "{{ kubernetes_version_rhel_package.split('.')[:2]  | join('.') }}"
     kubernetes_kubelet_extra_args: "--node-ip={{ ansible_enp0s8.ipv4.address }}"
     crictl_version: "v1.31.1"
@@ -35,18 +31,6 @@
           - system:bootstrappers:kubeadm:default-node-token
     kubernetes_allow_pods_on_master: true
   pre_tasks:
-  - name: update all packages
-    yum:
-      name: '*'
-      update_only: yes
-      update_cache: yes
-      state: latest
-
-  - name: Install epel release
-    yum:
-      name: epel-release
-      state: installed
-      
   - name: Enable br_netfilter module
     modprobe:
       name: br_netfilter
@@ -59,7 +43,7 @@
     when: swap_disabled == true
     
   - name: install ntp
-    yum:
+    package:
       name: ntp
       state: installed
   - name: update time
@@ -75,15 +59,6 @@
     - role: geerlingguy.pip
     - role: geerlingguy.containerd
     - role: geerlingguy.kubernetes
-      kubernetes_packages:
-        - name: kubelet-{{ kubernetes_version_rhel_package }}
-          state: present
-        - name: kubectl-{{ kubernetes_version_rhel_package }}
-          state: present
-        - name: kubeadm-{{ kubernetes_version_rhel_package }}
-          state: present
-        - name: kubernetes-cni
-          state: present
   post_tasks:
   - name: Configure Flannel networking for enp0s8
     shell: "curl {{ kubernetes_flannel_manifest_file }} | sed '/kube-subnet-mgr.*/a\\        - --iface=enp0s8' | kubectl apply -f -"
