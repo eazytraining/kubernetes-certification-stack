@@ -47,7 +47,7 @@
       name: ntp
       state: present
   - name: update time
-    service: name=ntpd state=restarted
+    service: name=ntp state=restarted
   - name: ipforward to 1
     sysctl:
       name: net.ipv4.ip_forward
