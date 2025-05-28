@@ -45,7 +45,7 @@
   - name: install ntp
     package:
       name: ntp
-      state: installed
+      state: present
   - name: update time
     service: name=ntpd state=restarted
   - name: ipforward to 1
