@@ -1,7 +1,7 @@
 
 #!/bin/bash
 # 1. Mettre à jour la liste des paquets et appliquer les mises à jour disponibles
-sudo apt update && sudo apt -y upgrade
+sudo apt update
 
 # 2. (Optionnel) Activer le dépôt Universe – l’équivalent le plus proche de « extras »
 #    – ainsi que le PPA officiel si vous souhaitez la dernière version stable d’Ansible
