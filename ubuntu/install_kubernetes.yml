@@ -5,6 +5,8 @@
     token: "783bde.3f89s0fje9f38fhf"
     swap_disabled: true
     kubernetes_install_repo: false
+    kubernetes_apt_key_url: "https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key"
+    kubernetes_apt_repository: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /"
 
     # Variables du rôle geerlingguy.kubernetes (conformes à defaults/main.yml)
     # kubernetes_install_repo: false
