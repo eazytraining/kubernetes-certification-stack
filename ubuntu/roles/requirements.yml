@@ -1,6 +1,6 @@
 roles:
   - src: geerlingguy.kubernetes
-    version: 8.1.0
+    version: 7.1.3
   - src: geerlingguy.containerd
   - src: geerlingguy.pip
 collections:
