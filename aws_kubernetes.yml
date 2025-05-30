@@ -162,11 +162,11 @@ Parameters:
 
   ImageTypeInstance:
     Description: image type for instance server
-    Default: "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"
+    Default: "CentOS Linux 7 (Core) - ami-0affd4508a5d2481b"
     Type: String
     AllowedValues:
 #      - "Debian GNU/Linux 9 (stretch) - ami-003f19e0e687de1cd"
-      - "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"
+      - "CentOS Linux 7 (Core) - ami-0affd4508a5d2481b"
     ConstraintDescription: must specify debian or centos
 
   StorageInstance:
@@ -192,7 +192,7 @@ Conditions:
   Launch3: !Equals [3, !Ref InstanceCount]
 
   DebianImageInstance: !Equals [!Ref ImageTypeInstance, "Debian GNU/Linux 9 (stretch) - ami-003f19e0e687de1cd"]
-  CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-012cc038cc685a0d7"]
+  CentosImageInstance: !Equals [!Ref ImageTypeInstance, "CentOS Linux 7 (Core) - ami-0affd4508a5d2481b"]
 
 Resources:
   workerLaunchTemplate:
@@ -203,7 +203,7 @@ Resources:
         MetadataOptions: 
           InstanceMetadataTags: "enabled"
         ImageId:
-          !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
+          !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0affd4508a5d2481b', ' ']]
         InstanceType: !Ref InstanceTypeInstance
         NetworkInterfaces: 
           - AssociatePublicIpAddress: "true"
@@ -496,7 +496,7 @@ Resources:
        - Key: Name
          Value: !Join ["-", [!Ref AWS::StackName, master]]
       ImageId:
-        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-012cc038cc685a0d7', ' ']]
+        !If [DebianImageInstance, 'ami-003f19e0e687de1cd', !If [CentosImageInstance, 'ami-0affd4508a5d2481b', ' ']]
       InstanceType: !Ref InstanceTypeInstance
       NetworkInterfaces: 
         - AssociatePublicIpAddress: "true"
