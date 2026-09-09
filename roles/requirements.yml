@@ -1,3 +1,4 @@
 roles:
-  - name: ulrich-sun.kubernetes
+  - src: ulrich-sun.kubernetes
+    name: kubernetes
     version: v1.0.4
