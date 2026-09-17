@@ -1,4 +1,4 @@
 roles:
   - src: https://github.com/eazytraining/ansible-roles-kubernetes.git
     name: kubernetes
-    version: v1.0.4
+    version: v1.0.7

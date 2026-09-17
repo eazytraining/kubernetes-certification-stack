@@ -6,7 +6,7 @@
     - role: kubernetes
       kubernetes_role: "{{ kubernetes_role }}"
       kubernetes_apiserver_advertise_address: "{{ kubernetes_apiserver_advertise_address }}"
-      k8s_version: "{{ k8s_version | default('1.35.8') }}"
+      k8s_version: "1.35.8"
       installation_method: "{{ installation_method }}"
       kubernetes_join_command: "{{ kubernetes_join_command | default(omit) }}"
   tasks:

@@ -7,8 +7,19 @@ MASTER_IP=$2
 echo "Role: $ROLE"
 echo "Master IP: $MASTER_IP"
 
-# Attendre le verrou dpkg au lieu d'échouer immédiatement si
-# unattended-upgrades tourne encore au premier boot de la VM
+# Au premier boot d'une VM Ubuntu fraiche, unattended-upgrades peut tenir
+# le verrou dpkg pendant tres longtemps (mise a jour noyau/systemd/etc.),
+# et un simple stop/disable ne l'empeche pas de redemarrer en cours de
+# route (timer/dependance). On le masque : aucun moyen de le (re)lancer
+# tant qu'on ne le demasque pas explicitement.
+sudo systemctl mask --now unattended-upgrades.service apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+sudo killall -9 unattended-upgrade 2>/dev/null || true
+sleep 2
+sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock
+sudo dpkg --configure -a
+
+# Garde-fou : si le verrou est malgre tout repris plus tard (tache apt du
+# role Ansible), attendre au lieu d'echouer immediatement
 echo 'DPkg::Lock::Timeout "600";' | sudo tee /etc/apt/apt.conf.d/99-dpkg-lock-timeout > /dev/null
 
 # Mettre à jour les paquets
