@@ -37,3 +37,26 @@ fonctionnel. Détail des correctifs apportés dans `install_kubernetes.sh` et
 Ces correctifs ont été validés par un `vagrant up` complet : les deux
 machines (master et worker) se créent, Kubernetes s'installe sur le master,
 et le worker rejoint automatiquement le cluster.
+
+## Réseau inter-nœuds (rôle `kubernetes` v1.0.7 et v1.0.8)
+
+Chaque VM Vagrant a deux interfaces : `enp0s3` (NAT, IP `10.0.2.15`
+**identique sur chaque VM**, injoignable entre nœuds) et `enp0s8` (réseau
+privé `192.168.99.x`, unique par VM). Par défaut, Kubernetes et Flannel
+choisissent l'interface de la route par défaut, donc le NAT.
+
+- **`kubectl logs` / `kubectl exec` en `NotFound` sur les pods du worker**
+  (v1.0.7) : kubelet annonçait `10.0.2.15` comme IP du nœud sur le master
+  et sur le worker. L'apiserver, pour joindre le kubelet du worker,
+  retombait sur son propre kubelet. Le rôle écrit désormais
+  `/etc/default/kubelet` avec `--node-ip=<IP de k8s_interface>` avant le
+  démarrage de kubelet.
+
+- **Échecs DNS depuis les pods du worker** (v1.0.8) : les deux nœuds
+  annonçaient la même extrémité de tunnel VXLAN (`10.0.2.15`), les pods du
+  worker ne joignaient donc pas CoreDNS (sur le master). Le rôle injecte
+  désormais `--iface={{ k8s_interface }}` dans les arguments du DaemonSet
+  `kube-flannel` avant de l'appliquer.
+
+Dans les deux cas, la variable `k8s_interface` (`enp0s8` par défaut) du rôle
+était définie mais jamais utilisée.
