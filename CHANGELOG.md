@@ -60,3 +60,22 @@ choisissent l'interface de la route par défaut, donc le NAT.
 
 Dans les deux cas, la variable `k8s_interface` (`enp0s8` par défaut) du rôle
 était définie mais jamais utilisée.
+
+- **Trafic vers les IP de Service bloqué entre nœuds** (v1.0.9) : même après
+  les correctifs ci-dessus, une connexion locale vers une IP de Service
+  (ex. `10.96.0.1`, utilisée par Flannel et CoreDNS pour joindre l'API)
+  pouvait repartir avec l'IP de l'interface NAT comme source — le noyau
+  choisit la source avant que le DNAT d'iptables ne s'applique, et la
+  destination d'origine (une IP virtuelle) ne correspond à aucune route
+  spécifique, donc tombe sur la route par défaut (NAT). Le nœud distant
+  recevait alors un paquet à la source incohérente avec sa table de
+  routage et le rejetait silencieusement, bloquant tout trafic vers les
+  IP de Service depuis un nœud non-master (`CrashLoopBackOff` en boucle
+  sur Flannel et CoreDNS). Le rôle active désormais `masqueradeAll: true`
+  sur le ConfigMap `kube-proxy` juste après l'initialisation du master,
+  pour forcer la réécriture systématique de l'adresse source.
+
+Ce dernier bug a été découvert après une corruption du datastore etcd
+(suite à un arrêt brutal du PC hôte pendant que les VM tournaient) ayant
+nécessité une réinitialisation complète du control-plane — voir la section
+Prérequis du README pour la bonne procédure d'arrêt (`vagrant halt`).
